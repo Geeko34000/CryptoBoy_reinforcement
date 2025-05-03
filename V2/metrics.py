@@ -280,3 +280,104 @@ class TradingMetrics:
                 buy_price = None
         
         if not trade_returns:
+            return 0.0
+        
+        # Calcul du rendement moyen par trade
+        return np.mean(trade_returns)
+    
+    def calculate_profit_factor(self, trades: List[Dict]) -> float:
+        """
+        Calcule le facteur de profit (somme des profits / somme des pertes).
+        
+        Args:
+            trades: Liste des trades
+        
+        Returns:
+            Facteur de profit
+        """
+        if not trades:
+            return 0.0
+        
+        total_profit = 0.0
+        total_loss = 0.0
+        
+        buy_price = None
+        buy_amount = None
+        
+        for trade in trades:
+            if trade['type'] == 'buy':
+                buy_price = trade['price']
+                buy_amount = trade.get('amount', 0)
+            elif trade['type'] == 'sell' and buy_price is not None and buy_amount is not None:
+                sell_price = trade['price']
+                sell_amount = trade.get('amount', 0)
+                
+                # Calculer le profit/perte
+                if min(buy_amount, sell_amount) > 0:
+                    pnl = (sell_price - buy_price) * min(buy_amount, sell_amount)
+                    
+                    if pnl > 0:
+                        total_profit += pnl
+                    else:
+                        total_loss += abs(pnl)
+                
+                # Réinitialiser pour le prochain trade
+                buy_price = None
+                buy_amount = None
+        
+        if total_loss == 0:
+            return float('inf') if total_profit > 0 else 0.0
+        
+        return total_profit / total_loss
+    
+    def calculate_calmar_ratio(self, portfolio_values: List[float], 
+                              timestamps: List[datetime]) -> float:
+        """
+        Calcule le ratio de Calmar (rendement annualisé / drawdown max).
+        
+        Args:
+            portfolio_values: Liste des valeurs du portefeuille
+            timestamps: Liste des timestamps correspondants
+        
+        Returns:
+            Ratio de Calmar
+        """
+        annualized_return = self.calculate_annualized_return(portfolio_values, timestamps)
+        max_drawdown = self.calculate_max_drawdown(portfolio_values)
+        
+        if max_drawdown == 0:
+            return 0.0
+        
+        return annualized_return / max_drawdown
+    
+    def calculate_all_metrics(self, portfolio_values: List[float], 
+                             trades: List[Dict], 
+                             timestamps: List[datetime],
+                             prices: List[float],
+                             risk_free_rate: float = 0.01) -> Dict[str, float]:
+        """
+        Calcule toutes les métriques disponibles.
+        
+        Args:
+            portfolio_values: Liste des valeurs du portefeuille
+            trades: Liste des trades
+            timestamps: Liste des timestamps
+            prices: Liste des prix
+            risk_free_rate: Taux sans risque annualisé
+        
+        Returns:
+            Dictionnaire contenant toutes les métriques
+        """
+        return {
+            'total_return': self.calculate_return(portfolio_values),
+            'annualized_return': self.calculate_annualized_return(portfolio_values, timestamps),
+            'volatility': self.calculate_volatility(portfolio_values),
+            'annualized_volatility': self.calculate_annualized_volatility(portfolio_values),
+            'sharpe_ratio': self.calculate_sharpe_ratio(portfolio_values, risk_free_rate),
+            'sortino_ratio': self.calculate_sortino_ratio(portfolio_values, risk_free_rate),
+            'max_drawdown': self.calculate_max_drawdown(portfolio_values),
+            'win_rate': self.calculate_win_rate(trades),
+            'avg_trade_return': self.calculate_avg_trade_return(trades, prices),
+            'profit_factor': self.calculate_profit_factor(trades),
+            'calmar_ratio': self.calculate_calmar_ratio(portfolio_values, timestamps)
+        }
